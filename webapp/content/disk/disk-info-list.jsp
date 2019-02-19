@@ -6,8 +6,22 @@
     <meta http-equiv="content-type" content="text/html; charset=UTF-8">
     <meta charset="utf-8">
     <title>网盘</title>
-    <%@include file="_s.jsp"%>
-	<link rel="stylesheet" href="${ctx}/s/disk/sprite_list_icon.css">
+    <%@include file="/common/s3.jsp"%>
+	<link rel="stylesheet" href="${cdnPrefix}/public/mossle-disk/0.0.3/sprite_list_icon.css">
+	<style type="text/css">
+.text-left .disk-tool {
+	display: none;
+	float: right;
+}
+.text-left.active .disk-tool {
+	display: inline-block;
+}
+	</style>
+	<style type="text/css">
+body {
+    padding-top: 50px;
+}
+	</style>
   </head>
   <body>
     <div id="wrap">&nbsp;
@@ -16,7 +30,9 @@
 
       <div class="container-fluid" style="padding: 0px 15px 0;" id="top">
         <div class="row">
-          <div class="col-md-12">
+		  <%@include file="/menu/disk.jsp"%>
+
+          <div class="col-md-10">
             <div class="alert-fixed-top" data-alerts="alerts" data-titles="{}" data-ids="myid" data-fade="1000"></div>
 
             <%pageContext.setAttribute("listType", "list");%> 
@@ -24,8 +40,8 @@
 
     <table id="tablereimburserecord1" class="table table-hover table-bordered">
       <thead>
-        <tr class="active">
-          <th class="col-md-1 text-left"></th>
+        <tr>
+          <th class="m-table-check"><input type="checkbox" name="checkAll" onchange="toggleSelectedItems(this.checked)"></th>
           <th class="col-md-7 text-left">文件名</th>
           <th class="col-md-2 text-left">大小</th>
           <th class="col-md-2 text-left">修改时间</th>
@@ -34,26 +50,27 @@
       <tbody id="tbodyFileInfo">
 	    <c:forEach items="${diskInfos}" var="item">
         <tr>
-		  <td class="text-center">
-			<c:if test="${item.type != 'dir'}">
-            <a href="disk-info-download.do?id=${item.id}"><i class=" glyphicon glyphicon-download-alt"></i></a>
-			</c:if>
-			<a href="javascript:void(0);renameFile(${item.id}, '${item.name}');"><i class="glyphicon glyphicon-pencil"></i></a>
-			<a href="javascript:void(0);moveFile(${item.id})"><i class="glyphicon glyphicon-move"></i></a>
-            <a href="javascript:void(0);removeFile(${item.id});"><i class="glyphicon glyphicon-remove"></i></a>
-            <a href="javascript:void(0);shareFile(${item.id});"><i class="glyphicon glyphicon-share"></i></a>
-          </td>
-          <td class="text-left">
+          <td><input type="checkbox" class="selectedItem a-check" name="selectedItem" value="${item.id}"></td>
+          <td class="text-left" onmouseover="this.className='text-left active'" onmouseout="this.className='text-left'">
 		    <i class="icon-16 icon-16-${item.type}"></i>
 			<c:if test="${item.type == 'dir'}">
 			<a href="disk-info-list.do?path=${path}/${item.name}">
-		    <span class="file-16-name">${item.name}</span>
+		      <span class="file-16-name">${item.name}</span>
 			</a>
 			</c:if>
 			<c:if test="${item.type != 'dir'}">
 		    <a href="disk-info-view.do?id=${item.id}">
-			<span class="file-16-name">${item.name}</span>
+			  <span class="file-16-name">${item.name}</span>
 			</a>
+			<span class="disk-tool" class="">
+			  <c:if test="${item.type != 'dir'}">
+              <a href="disk-info-download.do?id=${item.id}" title="下载"><i class=" glyphicon glyphicon-download-alt"></i></a>
+			  </c:if>
+			  <a href="javascript:void(0);renameFile(${item.id}, '${item.name}');" title="改名"><i class="glyphicon glyphicon-pencil"></i></a>
+			  <a href="javascript:void(0);moveFile(${item.id})" title="移动"><i class="glyphicon glyphicon-move"></i></a>
+              <a href="javascript:void(0);removeFile(${item.id});" title="删除"><i class="glyphicon glyphicon-remove"></i></a>
+              <a href="javascript:void(0);shareFile(${item.id});" title="分享"><i class="glyphicon glyphicon-share"></i></a>
+			</span>
 			</c:if>
 	      </td>
           <td class="text-left"><tags:fileSize fileSize="${item.fileSize}"/></td>
@@ -142,6 +159,28 @@ function renameFile(id, name) {
   </div><!-- /.modal-dialog -->
 </div><!-- /.modal -->
 
+<div id="shareDialog" class="modal fade">
+  <div class="modal-dialog">
+    <div class="modal-content">
+	  <form action="disk-info-share.do" method="post">
+	  <input id="shareId" type="hidden" name="id" value="">
+	  <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+        <h4 class="modal-title">分享</h4>
+      </div>
+      <div class="modal-body">
+	    <p>
+		  <button class="btn btn-default" name="type" value="public">公开分享</button>
+		</p>
+	    <p>
+		  <button class="btn btn-default" name="type" value="private">私密分享</button>
+		</p>
+      </div>
+	  </form>
+    </div><!-- /.modal-content -->
+  </div><!-- /.modal-dialog -->
+</div><!-- /.modal -->
+
 <script type="text/javascript">
 var setting = {
 	async: {
@@ -165,7 +204,9 @@ function moveFile(id) {
 }
 
 function shareFile(id) {
-	location.href = 'disk-share-sharePublic.do?id=' + id;
+	// location.href = 'disk-share-sharePublic.do?id=' + id;
+	$('#shareId').val(id);
+	$('#shareDialog').modal('show');
 }
 
 </script>

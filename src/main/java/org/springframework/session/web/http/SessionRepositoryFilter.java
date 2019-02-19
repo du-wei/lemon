@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2016 the original author or authors.
+ * Copyright 2014-2018 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -93,6 +93,9 @@ public class SessionRepositoryFilter<S extends ExpiringSession>
 	public static final String INVALID_SESSION_ID_ATTR = SESSION_REPOSITORY_ATTR
 			+ ".invalidSessionId";
 
+	private static final String CURRENT_SESSION_ATTR = SESSION_REPOSITORY_ATTR
+			+ ".CURRENT_SESSION";
+
 	/**
 	 * The default filter order.
 	 */
@@ -147,7 +150,7 @@ public class SessionRepositoryFilter<S extends ExpiringSession>
 	@Override
 	protected void doFilterInternal(HttpServletRequest request,
 			HttpServletResponse response, FilterChain filterChain)
-					throws ServletException, IOException {
+			throws ServletException, IOException {
 		request.setAttribute(SESSION_REPOSITORY_ATTR, this.sessionRepository);
 
 		SessionRepositoryRequestWrapper wrappedRequest = new SessionRepositoryRequestWrapper(
@@ -213,8 +216,6 @@ public class SessionRepositoryFilter<S extends ExpiringSession>
 	 */
 	private final class SessionRepositoryRequestWrapper
 			extends HttpServletRequestWrapper {
-		private final String CURRENT_SESSION_ATTR = HttpServletRequestWrapper.class
-				.getName();
 		private Boolean requestedSessionIdValid;
 		private boolean requestedSessionInvalidated;
 		private final HttpServletResponse response;
@@ -252,15 +253,15 @@ public class SessionRepositoryFilter<S extends ExpiringSession>
 
 		@SuppressWarnings("unchecked")
 		private HttpSessionWrapper getCurrentSession() {
-			return (HttpSessionWrapper) getAttribute(this.CURRENT_SESSION_ATTR);
+			return (HttpSessionWrapper) getAttribute(CURRENT_SESSION_ATTR);
 		}
 
 		private void setCurrentSession(HttpSessionWrapper currentSession) {
 			if (currentSession == null) {
-				removeAttribute(this.CURRENT_SESSION_ATTR);
+				removeAttribute(CURRENT_SESSION_ATTR);
 			}
 			else {
-				setAttribute(this.CURRENT_SESSION_ATTR, currentSession);
+				setAttribute(CURRENT_SESSION_ATTR, currentSession);
 			}
 		}
 
@@ -288,9 +289,10 @@ public class SessionRepositoryFilter<S extends ExpiringSession>
 			setCurrentSession(null);
 
 			HttpSessionWrapper newSession = getSession();
+			int originalMaxInactiveInterval = session.getMaxInactiveInterval();
 			original.setSession(newSession.getSession());
 
-			newSession.setMaxInactiveInterval(session.getMaxInactiveInterval());
+			newSession.setMaxInactiveInterval(originalMaxInactiveInterval);
 			for (Map.Entry<String, Object> attr : attrs.entrySet()) {
 				String attrName = attr.getKey();
 				Object attrValue = attr.getValue();

@@ -6,8 +6,8 @@
   <div class="container-fluid">
     <div class="navbar-header">
       <a class="navbar-brand" href="${tenantPrefix}/">
-	    <img src="${tenantPrefix}/s/logo32.png" class="img-responsive pull-left" style="margin-top:-5px;margin-right:5px;">
-	    Lemon <sub><small>1.7.0</small></sub>
+	    <img src="${cdnPrefix}/public/mossle/0.0.11/logo32.png" class="img-responsive pull-left" style="margin-top:-5px;margin-right:5px;">
+	    Lemon <sub><small>1.9.0</small></sub>
       </a>
     </div>
 
@@ -35,7 +35,7 @@
           </a>
           <ul class="dropdown-menu">
 		    <li class="text-center">&nbsp;<img src="${tenantPrefix}/rs/avatar?id=<tags:currentUserId/>&width=64" style="width:64px;height:64px;" class="img-rounded"></li>
-            <li><a href="${tenantPrefix}/user/my-info-input.do"><i class="glyphicon glyphicon-list"></i> 个人信息</a></li>
+            <li><a href="${tenantPrefix}/user/my/my-info-input.do"><i class="glyphicon glyphicon-list"></i> 个人信息</a></li>
             <li class="divider"></li>
 			<li><a href="${tenantPrefix}/j_spring_security_logout"><i class="glyphicon glyphicon-list"></i> 退出</a></li>
           </ul>

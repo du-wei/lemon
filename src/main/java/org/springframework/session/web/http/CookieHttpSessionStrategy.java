@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2016 the original author or authors.
+ * Copyright 2014-2018 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.StringTokenizer;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import javax.servlet.http.HttpServletRequest;
@@ -139,6 +140,11 @@ import org.springframework.util.Assert;
  */
 public final class CookieHttpSessionStrategy
 		implements MultiHttpSessionStrategy, HttpSessionManager {
+	/**
+	 * The default delimiter for both serialization and deserialization.
+	 */
+	private static final String DEFAULT_DELIMITER = " ";
+
 	private static final String SESSION_IDS_WRITTEN_ATTR = CookieHttpSessionStrategy.class
 			.getName().concat(".SESSIONS_WRITTEN_ATTR");
 
@@ -152,6 +158,18 @@ public final class CookieHttpSessionStrategy
 
 	private CookieSerializer cookieSerializer = new DefaultCookieSerializer();
 
+	/**
+	 * The delimiter between a session alias and a session id when reading a cookie value.
+	 * The default value is " ".
+	 */
+	private String deserializationDelimiter = DEFAULT_DELIMITER;
+
+	/**
+	 * The delimiter between a session alias and a session id when writing a cookie value.
+	 * The default is " ".
+	 */
+	private String serializationDelimiter = DEFAULT_DELIMITER;
+
 	public String getRequestedSessionId(HttpServletRequest request) {
 		Map<String, String> sessionIds = getSessionIds(request);
 		String sessionAlias = getCurrentSessionAlias(request);
@@ -162,7 +180,7 @@ public final class CookieHttpSessionStrategy
 		if (this.sessionParam == null) {
 			return DEFAULT_ALIAS;
 		}
-		String u = safeGetParameter(request, sessionParam);
+		String u = safeGetParameter(request, this.sessionParam);
 		if (u == null) {
 			return DEFAULT_ALIAS;
 		}
@@ -237,18 +255,18 @@ public final class CookieHttpSessionStrategy
 			return sessionIds.values().iterator().next();
 		}
 
-		StringBuffer buffer = new StringBuffer();
+		StringBuilder sb = new StringBuilder();
 		for (Map.Entry<String, String> entry : sessionIds.entrySet()) {
 			String alias = entry.getKey();
 			String id = entry.getValue();
 
-			buffer.append(alias);
-			buffer.append(" ");
-			buffer.append(id);
-			buffer.append(" ");
+			sb.append(alias);
+			sb.append(this.serializationDelimiter);
+			sb.append(id);
+			sb.append(this.serializationDelimiter);
 		}
-		buffer.deleteCharAt(buffer.length() - 1);
-		return buffer.toString();
+		sb.deleteCharAt(sb.length() - 1);
+		return sb.toString();
 	}
 
 	public void onInvalidateSession(HttpServletRequest request,
@@ -295,12 +313,38 @@ public final class CookieHttpSessionStrategy
 		this.cookieSerializer = serializer;
 	}
 
+	/**
+	 * Sets the delimiter between a session alias and a session id when deserializing a
+	 * cookie. The default is " " This is useful when using
+	 * <a href="https://tools.ietf.org/html/rfc6265">RFC 6265</a> for writing the cookies
+	 * which doesn't allow for spaces in the cookie values.
+	 *
+	 * @param delimiter the delimiter to set (i.e. "_ " will try a delimeter of either "_"
+	 * or " ")
+	 */
+	public void setDeserializationDelimiter(String delimiter) {
+		this.deserializationDelimiter = delimiter;
+	}
+
+	/**
+	 * Sets the delimiter between a session alias and a session id when deserializing a
+	 * cookie. The default is " ". This is useful when using
+	 * <a href="https://tools.ietf.org/html/rfc6265">RFC 6265</a> for writing the cookies
+	 * which doesn't allow for spaces in the cookie values.
+	 *
+	 * @param delimiter the delimiter to set (i.e. "_")
+	 */
+	public void setSerializationDelimiter(String delimiter) {
+		this.serializationDelimiter = delimiter;
+	}
+
 	public Map<String, String> getSessionIds(HttpServletRequest request) {
 		List<String> cookieValues = this.cookieSerializer.readCookieValues(request);
 		String sessionCookieValue = cookieValues.isEmpty() ? ""
 				: cookieValues.iterator().next();
 		Map<String, String> result = new LinkedHashMap<String, String>();
-		StringTokenizer tokens = new StringTokenizer(sessionCookieValue, " ");
+		StringTokenizer tokens = new StringTokenizer(sessionCookieValue,
+				this.deserializationDelimiter);
 		if (tokens.countTokens() == 1) {
 			result.put(DEFAULT_ALIAS, tokens.nextToken());
 			return result;
@@ -340,12 +384,16 @@ public final class CookieHttpSessionStrategy
 		String replacement = isDefaultAlias ? "" : "$1" + encodedSessionAlias;
 		query = query.replaceFirst("((^|&)" + this.sessionParam + "=)([^&]+)?",
 				replacement);
-		if (!isDefaultAlias && url.endsWith(query)) {
+		String sessionParamReplacement = String.format("%s=%s", this.sessionParam,
+				encodedSessionAlias);
+
+		if (!isDefaultAlias && !query.contains(sessionParamReplacement)
+				&& url.endsWith(query)) {
 			// no existing alias
 			if (!(query.endsWith("&") || query.length() == 0)) {
 				query += "&";
 			}
-			query += this.sessionParam + "=" + encodedSessionAlias;
+			query += sessionParamReplacement;
 		}
 
 		return path + "?" + query;
@@ -372,19 +420,43 @@ public final class CookieHttpSessionStrategy
 			this.request = request;
 		}
 
+		private String getCurrentSessionAliasFromUrl(String url) {
+			String currentSessionAliasFromUrl = null;
+			int queryStart = url.indexOf("?");
+
+			if (queryStart >= 0) {
+				String query = url.substring(queryStart + 1);
+				Matcher matcher = Pattern
+						.compile(String.format("%s=([^&]+)",
+								CookieHttpSessionStrategy.this.sessionParam))
+						.matcher(query);
+
+				if (matcher.find()) {
+					currentSessionAliasFromUrl = matcher.group(1);
+				}
+			}
+
+			return currentSessionAliasFromUrl;
+		}
+
 		@Override
 		public String encodeRedirectURL(String url) {
-			url = super.encodeRedirectURL(url);
-			return CookieHttpSessionStrategy.this.encodeURL(url,
-					getCurrentSessionAlias(this.request));
+			String encodedUrl = super.encodeRedirectURL(url);
+			String currentSessionAliasFromUrl = getCurrentSessionAliasFromUrl(encodedUrl);
+			String alias = (currentSessionAliasFromUrl != null)
+					? currentSessionAliasFromUrl : getCurrentSessionAlias(this.request);
+
+			return CookieHttpSessionStrategy.this.encodeURL(encodedUrl, alias);
 		}
 
 		@Override
 		public String encodeURL(String url) {
-			url = super.encodeURL(url);
+			String encodedUrl = super.encodeURL(url);
+			String currentSessionAliasFromUrl = getCurrentSessionAliasFromUrl(encodedUrl);
+			String alias = (currentSessionAliasFromUrl != null)
+					? currentSessionAliasFromUrl : getCurrentSessionAlias(this.request);
 
-			String alias = getCurrentSessionAlias(this.request);
-			return CookieHttpSessionStrategy.this.encodeURL(url, alias);
+			return CookieHttpSessionStrategy.this.encodeURL(encodedUrl, alias);
 		}
 	}
 

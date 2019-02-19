@@ -12,8 +12,8 @@
             <span class="icon-bar"></span>
           </a>
           <a href="${tenantPrefix}/" class="brand">
-	        <img src="${tenantPrefix}/s/logo32.png" class="img-responsive pull-left" style="margin-top:-12px;margin-right:5px;">
-		    Lemon <sub><small>1.7.0</small></sub>
+			<img src="${cdnPrefix}/public/mossle/0.0.11/logo32.png" class="img-responsive pull-left" style="margin-top:-5px;margin-right:5px;">
+			Lemon <sub><small>1.9.0</small></sub>
 		  </a>
           <div class="nav-collapse collapse navbar-responsive-collapse">
             <ul class="nav">

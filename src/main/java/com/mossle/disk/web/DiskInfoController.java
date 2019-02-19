@@ -2,6 +2,7 @@ package com.mossle.disk.web;
 
 import java.io.InputStream;
 
+import java.util.Date;
 import java.util.List;
 
 import javax.annotation.Resource;
@@ -9,16 +10,18 @@ import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import com.mossle.api.auth.CurrentUserHolder;
 import com.mossle.api.store.StoreConnector;
 import com.mossle.api.tenant.TenantHolder;
 
-import com.mossle.core.auth.CurrentUserHolder;
 import com.mossle.core.store.MultipartFileDataSource;
 import com.mossle.core.util.IoUtils;
 import com.mossle.core.util.ServletUtils;
 
 import com.mossle.disk.persistence.domain.DiskInfo;
+import com.mossle.disk.persistence.domain.DiskShare;
 import com.mossle.disk.persistence.manager.DiskInfoManager;
+import com.mossle.disk.persistence.manager.DiskShareManager;
 import com.mossle.disk.service.DiskService;
 
 import org.slf4j.Logger;
@@ -39,6 +42,7 @@ public class DiskInfoController {
     private static Logger logger = LoggerFactory
             .getLogger(DiskInfoController.class);
     private DiskInfoManager diskInfoManager;
+    private DiskShareManager diskShareManager;
     private CurrentUserHolder currentUserHolder;
     private StoreConnector storeConnector;
     private DiskService diskService;
@@ -88,7 +92,11 @@ public class DiskInfoController {
     @RequestMapping("disk-info-upload")
     @ResponseBody
     public String upload(@RequestParam("file") MultipartFile file,
-            @RequestParam("path") String path) throws Exception {
+            @RequestParam("path") String path,
+            @RequestParam("lastModified") long lastModified)
+            throws Exception {
+        logger.info("lastModified : {}", lastModified);
+
         String userId = currentUserHolder.getUserId();
         String tenantId = tenantHolder.getTenantId();
         diskService.createFile(userId, new MultipartFileDataSource(file),
@@ -153,7 +161,7 @@ public class DiskInfoController {
             ServletUtils.setFileDownloadHeader(request, response,
                     diskInfo.getName());
             is = storeConnector
-                    .getStore("default/user/" + userId, diskInfo.getRef(),
+                    .getStore("disk/user/" + userId, diskInfo.getRef(),
                             tenantId).getDataSource().getInputStream();
             IoUtils.copyStream(is, response.getOutputStream());
         } finally {
@@ -277,10 +285,65 @@ public class DiskInfoController {
         return buff.toString();
     }
 
+    /**
+     * 分享.
+     */
+    @RequestMapping("disk-info-share")
+    public String share(@RequestParam("id") Long id,
+            @RequestParam("type") String type) {
+        DiskInfo diskInfo = diskInfoManager.get(id);
+        DiskShare diskShare = diskShareManager.findUniqueBy("diskInfo",
+                diskInfo);
+
+        if (diskShare != null) {
+            return "redirect:/disk/disk-share-list.do";
+        }
+
+        diskShare = new DiskShare();
+        diskShare.setShareType(type);
+        diskShare.setShareTime(new Date());
+        diskShare.setDiskInfo(diskInfo);
+        diskShare.setName(diskInfo.getName());
+        diskShare.setCreator(diskInfo.getCreator());
+        diskShare.setType(diskInfo.getType());
+        diskShare.setDirType(diskInfo.getDirType());
+        diskShare.setCountView(0);
+        diskShare.setCountSave(0);
+        diskShare.setCountDownload(0);
+
+        if ("private".equals(type)) {
+            diskShare.setSharePassword(this.generatePassword());
+        }
+
+        diskShareManager.save(diskShare);
+
+        return "redirect:/disk/disk-share-list.do";
+    }
+
+    public String generatePassword() {
+        int value = (int) (((Math.random() * 9) + 1) * 1679616);
+        char[] c = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '0',
+                'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l',
+                'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x',
+                'y', 'z' };
+        StringBuilder buff = new StringBuilder();
+        buff.append(c[(value / 36 / 36 / 36) % 36]);
+        buff.append(c[(value / 36 / 36) % 36]);
+        buff.append(c[(value / 36) % 36]);
+        buff.append(c[value % 36]);
+
+        return buff.toString();
+    }
+
     // ~ ======================================================================
     @Resource
     public void setDiskInfoManager(DiskInfoManager diskInfoManager) {
         this.diskInfoManager = diskInfoManager;
+    }
+
+    @Resource
+    public void setDiskShareManager(DiskShareManager diskShareManager) {
+        this.diskShareManager = diskShareManager;
     }
 
     @Resource
